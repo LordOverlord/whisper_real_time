@@ -24,19 +24,14 @@ def main():
     parser.add_argument("--phrase_timeout", default=6,
                         help="How much empty space between recordings before we "
                              "consider it a new line in the transcription.", type=float)
-    parser.add_argument("--save_name", default="transcripcion",
-                    help="Nombre base del archivo sin extensión.")
-    parser.add_argument("--save_format", choices=["txt", "srt"], default="txt",
-                    help="Formato del archivo: txt o srt.")
+    parser.add_argument("--save_file", default=None,
+                    help="Archivo de salida para guardar transcripción en tiempo real.", type=str)
+
     if 'linux' in platform:
         parser.add_argument("--default_microphone", default='pulse',
                             help="Default microphone name for SpeechRecognition. "
                                  "Run this with 'list' to view available Microphones.", type=str)
     args = parser.parse_args()
-
-    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-
-    output_filename = f"{args.save_name}_{timestamp}.{args.save_format}"
 
     # The last time a recording was retrieved from the queue.
     phrase_time = None
@@ -133,11 +128,11 @@ def main():
                     result = audio_model.transcribe(
                         audio_np,
                         fp16=torch.cuda.is_available(),
-                        #language='es',
+                        language='es',
                         temperature=0.0
                     )
                     end = datetime.now()
-                    #print(f"⏱️ Tiempo de transcripción: {(end - start).total_seconds():.2f}s")
+                    print(f"⏱️ Tiempo de transcripción: {(end - start).total_seconds():.2f}s")
                     text = result['text'].strip()
                 except Exception as e:
                      print(f"⚠️ Error en transcripción: {e}")
@@ -150,30 +145,13 @@ def main():
                     else:
                         transcription[-1] = text
                 # Guardar transcripción si se especificó un archivo
-                if args.save_format == "txt":
+                if args.save_file:
                     try:
-                        with open(output_filename, "w", encoding="utf-8") as f:
+                        with open(args.save_file, "w", encoding="utf-8") as f:
                             for line in transcription:
                                 f.write(f"{line.strip()}\n")
                     except Exception as e:
-                        print(f"⚠️ No se pudo guardar el archivo TXT: {e}")
-
-                elif args.save_format == "srt":
-                    if not hasattr(main, "srt_index"):
-                        main.srt_index = 1
-                        main.srt_time = datetime.now()
-
-                    srt_start = main.srt_time.strftime("%H:%M:%S,000")
-                    main.srt_time = datetime.now()
-                    srt_end = main.srt_time.strftime("%H:%M:%S,000")
-
-                    try:
-                        with open(output_filename, "a", encoding="utf-8") as f:
-                            f.write(f"{main.srt_index}\n{srt_start} --> {srt_end}\n{text.strip()}\n\n")
-                            main.srt_index += 1
-                    except Exception as e:
-                        print(f"⚠️ No se pudo guardar el archivo SRT: {e}")
-
+                        print(f"⚠️ No se pudo guardar el archivo: {e}")
                 # Clear the console to reprint the updated transcription.
                 os.system('cls' if os.name=='nt' else 'clear')
                 for line in transcription:

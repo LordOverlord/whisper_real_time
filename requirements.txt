@@ -1,7 +1,9 @@
 setuptools
 pyaudio
 SpeechRecognition
---extra-index-url https://download.pytorch.org/whl/cu116
+--extra-index-url https://download.pytorch.org/whl/nightly/cu121
 torch
 numpy
 git+https://github.com/openai/whisper.git
+torchvision 
+torchaudio

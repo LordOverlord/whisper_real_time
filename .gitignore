@@ -1,0 +1,12 @@
+venv-py312/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.log
+*.wav
+*.mp4
+*.mp3
+*.zip
+*.tar.gz
+*.egg-info/

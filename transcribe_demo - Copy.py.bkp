@@ -37,6 +37,8 @@ def main():
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
     output_filename = f"{args.save_name}_{timestamp}.{args.save_format}"
+    
+    last_srt_end_time = 0.0
 
     # The last time a recording was retrieved from the queue.
     phrase_time = None
@@ -77,7 +79,8 @@ def main():
     record_timeout = args.record_timeout
     phrase_timeout = args.phrase_timeout
 
-    transcription = ['']
+    transcription_txt = ['']
+    transcription_srt = []
 
     with source:
         recorder.adjust_for_ambient_noise(source)
@@ -144,40 +147,56 @@ def main():
 
                 # If we detected a pause between recordings, add a new item to our transcription.
                 # Otherwise edit the existing one.
-                if text:
-                    if phrase_complete:
-                        transcription.append(text)
+                if result and "segments" in result:
+                    for seg in result["segments"]:
+                        if seg["end"] <= last_srt_end_time:
+                            continue  # ya fue transcrito
+                        seg_text = seg["text"].strip()
+                        if not seg_text:
+                            continue
+                        
+                        # 📝 TXT
+                        transcription_txt.append(seg_text)
+
+                        # 🧾 SRT
+                        start_sec = seg["start"]
+                        end_sec = seg["end"]
+                        start_time = str(timedelta(seconds=int(start_sec))).zfill(8) + ",000"
+                        end_time = str(timedelta(seconds=int(end_sec))).zfill(8) + ",000"
+                        transcription_srt.append({
+                            "index": len(transcription_srt) + 1,
+                            "start": start_time,
+                            "end": end_time,
+                            "text": seg_text
+                        })
+                        last_srt_end_time = max(last_srt_end_time, seg["end"])
                     else:
-                        transcription[-1] = text
+                        transcription_txt[-1] = text
                 # Guardar transcripción si se especificó un archivo
                 if args.save_format == "txt":
                     try:
                         with open(output_filename, "w", encoding="utf-8") as f:
-                            for line in transcription:
-                                f.write(f"{line.strip()}\n")
+                            for line in transcription_txt:
+                                f.write(f"{line}\n")
                     except Exception as e:
                         print(f"⚠️ No se pudo guardar el archivo TXT: {e}")
 
                 elif args.save_format == "srt":
-                    if not hasattr(main, "srt_index"):
-                        main.srt_index = 1
-                        main.srt_time = datetime.now()
-
-                    srt_start = main.srt_time.strftime("%H:%M:%S,000")
-                    main.srt_time = datetime.now()
-                    srt_end = main.srt_time.strftime("%H:%M:%S,000")
-
                     try:
-                        with open(output_filename, "a", encoding="utf-8") as f:
-                            f.write(f"{main.srt_index}\n{srt_start} --> {srt_end}\n{text.strip()}\n\n")
-                            main.srt_index += 1
+                        with open(output_filename, "w", encoding="utf-8") as f:
+                            for block in transcription_srt:
+                                f.write(f"{block['index']}\n{block['start']} --> {block['end']}\n{block['text']}\n\n")
                     except Exception as e:
                         print(f"⚠️ No se pudo guardar el archivo SRT: {e}")
 
                 # Clear the console to reprint the updated transcription.
                 os.system('cls' if os.name=='nt' else 'clear')
-                for line in transcription:
-                    print(line)
+                if args.save_format == "txt":
+                    for line in transcription_txt:
+                        print(line)
+                elif args.save_format == "srt":
+                    for block in transcription_srt:
+                        print(f"[{block['start']} - {block['end']}] {block['text']}")
                 # Flush stdout.
                 print('', end='', flush=True)
             else:
@@ -187,8 +206,12 @@ def main():
             break
 
     print("\n\nTranscription:")
-    for line in transcription:
-        print(line)
+    if args.save_format == "txt":
+        for line in transcription_txt:
+            print(line)
+    elif args.save_format == "srt":
+        for block in transcription_srt:
+            print(f"[{block['start']} - {block['end']}] {block['text']}")
 
 
 if __name__ == "__main__":
