@@ -10,3 +10,8 @@ __pycache__/
 *.zip
 *.tar.gz
 *.egg-info/
+
+# Ignore text files that are generated
+*.txt
+!requirements.txt
+
